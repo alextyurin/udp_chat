@@ -18,6 +18,7 @@ SOURCES += main.cpp\
     client.cpp
 
 HEADERS  += mainwindow.h \
-    client.hpp
+    client.hpp \
+    ../message_interface.hpp
 
 FORMS    += mainwindow.ui

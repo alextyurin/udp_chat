@@ -2,8 +2,9 @@
 
 #include <QObject>
 #include <QVector>
-#include <QString>
 #include <QHostAddress>
+#include <QString>
+#include "../message_interface.hpp"
 
 class QUdpSocket;
 class QByteArray;
@@ -13,35 +14,28 @@ namespace udp_chat
 namespace server
 {
 
+struct user_s
+{
+    QHostAddress address;
+    quint16 port;
+    QString nickname;
+}; //struct user_s
+
+typedef QVector<user_s> users_t;
+
 class Server : public QObject
 {
     Q_OBJECT
 public:
-    struct User
-    {
-        QString nickname;
-        QHostAddress address;
-    };
-    enum MessageType
-    {
-        MT_MESSAGE,
-        MT_ONLINE,
-        MT_PRIVATE_MESSAGE
-    };
-    struct ServerMessage
-    {
-        MessageType type;
-        QByteArray data;
-    };
-    Server(const unsigned short port, QObject *parent = nullptr);
+    Server(const quint16 port, QObject *parent = nullptr);
     virtual ~Server();
     void start();
+    void send_connected_msg(const QHostAddress &address, const quint16 port);
 private slots:
     void readPendingDatagrams();
 private:
-    QVector <User> m_users;
+    users_t m_users;
     QUdpSocket *m_socket;
-    unsigned short m_port;
 };
 
 

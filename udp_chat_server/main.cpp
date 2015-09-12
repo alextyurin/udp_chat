@@ -1,3 +1,5 @@
+#include <exception>
+#include <iostream>
 #include <QCoreApplication>
 #include "server.hpp"
 
@@ -9,7 +11,14 @@ const int port = 10000;
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    udp_chat::server::Server server(port);
-    server.start();
+    //try
+    {
+        udp_chat::server::Server server(port);
+        server.start();
+    }
+    /*catch (std::exception &ex)
+    {
+        std::cout << ex.what() << std::endl;
+    }*/
     return a.exec();
 }

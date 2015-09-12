@@ -19,4 +19,5 @@ SOURCES += main.cpp \
     server.cpp
 
 HEADERS += \
-    server.hpp
+    server.hpp \
+    ../message_interface.hpp
