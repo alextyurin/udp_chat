@@ -16,8 +16,11 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp \
-    server.cpp
+    server.cpp \
+    ../common/datagram.cpp
 
 HEADERS += \
     server.hpp \
-    ../message_interface.hpp
+    ../common/message_interface.hpp \
+    ../common/datagram.hpp \
+    ../common/exception.hpp

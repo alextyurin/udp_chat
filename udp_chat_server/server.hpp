@@ -1,10 +1,13 @@
 #pragma once
 
 #include <QObject>
-#include <QVector>
+#include <QMap>
 #include <QHostAddress>
 #include <QString>
-#include "../message_interface.hpp"
+#include <QThread>
+#include <QMutex>
+#include "../common/datagram.hpp"
+#include "../common/message_interface.hpp"
 
 class QUdpSocket;
 class QByteArray;
@@ -16,12 +19,12 @@ namespace server
 
 struct user_s
 {
-    QHostAddress address;
-    quint16 port;
     QString nickname;
+    bool checked;
 }; //struct user_s
 
-typedef QVector<user_s> users_t;
+typedef QMap<user_desc_s, user_s> users_t;
+
 
 class Server : public QObject
 {
@@ -30,14 +33,37 @@ public:
     Server(const quint16 port, QObject *parent = nullptr);
     virtual ~Server();
     void start();
-    void send_connected_msg(const QHostAddress &address, const quint16 port);
+    void send_check_connection_query();
 private slots:
-    void readPendingDatagrams();
+    void listen();
 private:
+    void send_connected_answer(const QHostAddress &address, const quint16 port);
+    void send_user_online_answer(const user_s &user, const QHostAddress &address, const quint16 port);
+    void process_connection_query(Datagram &data, const QHostAddress &address, const quint16 port);
+    void read_datagram(QByteArray &byte_array, const QHostAddress &address, const quint16 port);
+    void send_descriptor(desc_s desc, const QHostAddress &address, const quint16 port);
     users_t m_users;
     QUdpSocket *m_socket;
+    QMutex m_mutex;
 };
 
+class CheckConnection : public QThread
+{
+    Q_OBJECT
+public:
+    explicit CheckConnection(Server *server):QThread(server), m_server(server) {}
+    virtual ~CheckConnection() {}
+private:
+    void run()
+    {
+        while (true)
+        {
+            m_server->send_check_connection_query();
+            QThread::sleep(1);
+        }
+    }
+    Server *m_server;
+};
 
 } //namespace server
 } //namespace udp_chat
