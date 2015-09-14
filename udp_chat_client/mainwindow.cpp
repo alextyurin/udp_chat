@@ -7,6 +7,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     ui->centralWidget->setLayout(ui->general);
+    QObject::connect(this->ui->sendButton, SIGNAL(clicked()), this, SLOT(button_clicked()));
 }
 
 MainWindow::~MainWindow()
@@ -18,4 +19,14 @@ void MainWindow::reset()
 {
     ui->sendButton->setEnabled(false);
     ui->textEdit->setEnabled(false);
+}
+
+void MainWindow::recieve_msg(const QString &msg)
+{
+    ui->textView->append(msg);
+}
+
+void MainWindow::button_clicked()
+{
+    send_msg(ui->textEdit->toPlainText().toLocal8Bit());
 }

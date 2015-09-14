@@ -38,10 +38,13 @@ private slots:
     void listen();
 private:
     void send_connected_answer(const QHostAddress &address, const quint16 port);
-    void send_user_online_answer(const user_s &user, const QHostAddress &address, const quint16 port);
+    void send_user_online_answer(user_desc_s &user_desc, const user_s &user, const QHostAddress &address, const quint16 port);
+    void send_user_offline_answer(user_desc_s &user_desc, const QHostAddress &address, const quint16 port);
+    void send_message_answer(const QString &msg, user_desc_s &user_desc, const QHostAddress &address, const quint16 port);
     void process_connection_query(Datagram &data, const QHostAddress &address, const quint16 port);
+    QString process_message_query(Datagram &data);
     void read_datagram(QByteArray &byte_array, const QHostAddress &address, const quint16 port);
-    void send_descriptor(desc_s desc, const QHostAddress &address, const quint16 port);
+    void send_descriptor(desc_s &desc, const QHostAddress &address, const quint16 port);
     users_t m_users;
     QUdpSocket *m_socket;
     QMutex m_mutex;

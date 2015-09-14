@@ -49,7 +49,7 @@ void Server::listen()
     }
 }
 
-void Server::send_descriptor(desc_s desc, const QHostAddress &address, const quint16 port)
+void Server::send_descriptor(desc_s &desc, const QHostAddress &address, const quint16 port)
 {
     QByteArray datagram;
     datagram.resize(sizeof(desc_s));
@@ -63,7 +63,7 @@ void Server::send_connected_answer(const QHostAddress &address, const quint16 po
     send_descriptor(desc, address, port);
 }
 
-void Server::send_user_online_answer(const user_s &user, const QHostAddress &address, const quint16 port)
+void Server::send_user_online_answer(user_desc_s &user_desc, const user_s &user, const QHostAddress &address, const quint16 port)
 {
     QByteArray byte_array;
     quint32 nickname_size = user.nickname.length();
@@ -74,24 +74,40 @@ void Server::send_user_online_answer(const user_s &user, const QHostAddress &add
     answer::user_online_answer_desc_s desc;
     datagram.write(&desc, sizeof(answer::user_online_answer_desc_s));
     //user desc
-    user_desc_s user_desc;
-    user_desc.ip = address.toIPv4Address();
-    user_desc.port = port;
     datagram.write(&user_desc, sizeof(user_desc_s));
     //nickname
     datagram.write(&nickname_size, sizeof(quint32));
     datagram.write(user.nickname.toLocal8Bit().data(), nickname_size);
     m_socket->writeDatagram(byte_array, address, port);
 }
+
+void Server::send_user_offline_answer(user_desc_s &user_desc, const QHostAddress &address, const quint16 port)
+{
+    QByteArray byte_array;
+    const quint32 datagram_size = sizeof(answer::user_offline_answer_desc_s) + sizeof(user_desc_s);
+    byte_array.resize(datagram_size);
+    Datagram datagram(byte_array);
+    //desc
+    answer::user_offline_answer_desc_s desc;
+    datagram.write(&desc, sizeof(answer::user_offline_answer_desc_s));
+    //user desc
+    datagram.write(&user_desc, sizeof(user_desc_s));
+    m_socket->writeDatagram(byte_array, address, port);
+}
+
 void Server::send_check_connection_query()
 {
     m_mutex.lock();
-    for (auto &user : m_users.keys())
+    for (auto &user_desc : m_users.keys())
     {
-        if (!m_users[user].checked)
+        if (!m_users[user_desc].checked)
         {
-            std::cout << "User " << m_users[user].nickname.toStdString() << " disconected" << std::endl;
-            m_users.remove(user);
+            std::cout << "User " << m_users[user_desc].nickname.toStdString() << " disconected" << std::endl;
+            m_users.remove(user_desc);
+            for (auto &user : m_users.keys())
+            {
+                send_user_offline_answer(user_desc, QHostAddress(user.ip), user.port);
+            }
         }
     }
     m_mutex.unlock();
@@ -111,13 +127,31 @@ void Server::send_check_connection_query()
     m_mutex.unlock();
 }
 
+void Server::send_message_answer(const QString &msg, user_desc_s &user_desc, const QHostAddress &address, const quint16 port)
+{
+    QByteArray byte_array;
+    quint32 msg_size = msg.length();
+    const quint32 datagram_size = sizeof(answer::message_answer_desc_s) + sizeof(user_desc_s) + sizeof(quint32) + msg_size;
+    byte_array.resize(datagram_size);
+    Datagram datagram(byte_array);
+    //desc
+    answer::message_answer_desc_s desc;
+    datagram.write(&desc, sizeof(answer::message_answer_desc_s));
+    //user desc
+    datagram.write(&user_desc, sizeof(user_desc_s));
+    //msg
+    datagram.write(&msg_size, sizeof(quint32));
+    datagram.write(msg.toLocal8Bit().data(), msg_size);
+    m_socket->writeDatagram(byte_array, address, port);
+}
+
 void Server::process_connection_query(Datagram &data, const QHostAddress &address, const quint16 port)
 {
     QByteArray nickname;
-    quint32 nickname_length;
-    data.read(&nickname_length, sizeof(quint32));
-    nickname.resize(nickname_length);
-    data.read(nickname.data(), nickname_length);
+    quint32 nickname_size;
+    data.read(&nickname_size, sizeof(quint32));
+    nickname.resize(nickname_size);
+    data.read(nickname.data(), nickname_size);
 
     std::cout << "User " << QString(nickname).toStdString() << " from " << address.toString().toStdString() << "::" << port << " connects..." << std::endl;
 
@@ -130,8 +164,22 @@ void Server::process_connection_query(Datagram &data, const QHostAddress &addres
     user.checked = true;
 
     m_mutex.lock();
+    for (auto &connected_user_desc : m_users.keys())
+    {
+        send_user_online_answer(user_desc, user, QHostAddress(connected_user_desc.ip), connected_user_desc.port);
+    }
     m_users.insert(user_desc, user);
     m_mutex.unlock();
+}
+
+QString Server::process_message_query(Datagram &data)
+{
+    QByteArray msg;
+    quint32 msg_size;
+    data.read(&msg_size, sizeof(quint32));
+    msg.resize(msg_size);
+    data.read(msg.data(), msg_size);
+    return std::move(QString(msg));
 }
 
 void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, const quint16 port)
@@ -152,15 +200,25 @@ void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
         {
             std::cout << "Recive who_is_online query from " << address.toString().toStdString() << "::" << port << std::endl;
             m_mutex.lock();
-            for (auto &user : m_users)
+            for (auto &connected_user_desc : m_users.keys())
             {
-                send_user_online_answer(user, address, port);
+                send_user_online_answer(connected_user_desc, m_users[connected_user_desc], address, port);
             }
             m_mutex.unlock();
         }
         else if (query::QueryType::MESSAGE == desc.type)
         {
-
+            QString msg = process_message_query(data);
+            user_desc_s sender;
+            sender.ip = address.toIPv4Address();
+            sender.port = port;
+            std::cout << "Recieved message from " << m_users[sender].nickname.toStdString() << "[" << QHostAddress(sender.ip).toString().toStdString() << "::" << sender.port << "]: " << msg.toStdString() << std::endl;
+            m_mutex.lock();
+            for (auto &user_desc : m_users.keys())
+            {
+                send_message_answer(msg, sender, QHostAddress(user_desc.ip), user_desc.port);
+            }
+            m_mutex.unlock();
         }
         else if (query::QueryType::PRIVATE_MESSAGE == desc.type)
         {
@@ -168,7 +226,8 @@ void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
         }
         else if (query::QueryType::CHECK_CONNECTION == desc.type)
         {
-
+           answer::check_connection_answer_desc_s desc;
+           send_descriptor(desc, address, port);
         }
     }
     else if (answer::answer_signature == desc.signature)
