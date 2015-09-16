@@ -25,7 +25,6 @@ struct user_s
 
 typedef QMap<user_desc_s, user_s> users_t;
 
-
 class Server : public QObject
 {
     Q_OBJECT

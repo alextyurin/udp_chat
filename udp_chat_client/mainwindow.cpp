@@ -26,7 +26,26 @@ void MainWindow::recieve_msg(const QString &msg)
     ui->textView->append(msg);
 }
 
+void MainWindow::append_user(const QString &nickname)
+{
+    ui->user_list->addItem(nickname);
+}
+
+void MainWindow::remove_user(const QString &nickname)
+{
+    for(int i = 0; i < ui->user_list->count(); ++i)
+    {
+        QListWidgetItem* item = ui->user_list->item(i);
+        if (item->text() == nickname)
+        {
+            ui->user_list->takeItem(ui->user_list->row(item));
+        }
+    }
+}
+
 void MainWindow::button_clicked()
 {
     send_msg(ui->textEdit->toPlainText().toLocal8Bit());
+    ui->textEdit->clear();
 }
+

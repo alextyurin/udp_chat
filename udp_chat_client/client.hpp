@@ -29,6 +29,8 @@ public:
     bool send_check_connection_query();
 signals:
     void show_message(const QString &msg);
+    void user_online(const QString &nickname);
+    void user_offline(const QString &nickname);
 private slots:
     void listen();
     void send_message_query(const QString &msg);

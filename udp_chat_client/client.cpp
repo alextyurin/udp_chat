@@ -43,11 +43,6 @@ void Client::start()
     connect(m_socket, SIGNAL(readyRead()), this, SLOT(listen()));
 }
 
-void show_message(const QString &msg)
-{
-    emit msg;
-}
-
 void Client::send_connection_query()
 {
     QByteArray byte_array;
@@ -137,6 +132,7 @@ void Client::process_user_online_answer(Datagram &data)
     nickname.resize(nickname_length);
     data.read(nickname.data(), nickname_length);
     m_users[user_desc] = QString(nickname);
+    user_online(QString(nickname));
     qDebug() << QString(nickname) << user_desc.port << " online!";
 }
 
@@ -145,6 +141,7 @@ void Client::process_user_offline_answer(Datagram &data)
     //user desc
     user_desc_s user_desc;
     data.read(&user_desc, sizeof(user_desc_s));
+    user_offline(QString(m_users[user_desc]));
     qDebug() << m_users[user_desc] << " ofline!";
     m_users.remove(user_desc);
 }
@@ -159,7 +156,7 @@ void Client::process_message_answer(Datagram &data)
     data.read(&msg_size, sizeof(quint32));
     msg.resize(msg_size);
     data.read(msg.data(), msg_size);
-    show_message(QString(msg));
+    show_message(m_users[user_desc] + ": " + QString(msg));
     qDebug() << "Recieve msg from " << m_users[user_desc] << ": " << QString(msg);
 }
 
@@ -211,6 +208,7 @@ void Client::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
         }
     }
 }
+
 
 void Client::listen()
 {

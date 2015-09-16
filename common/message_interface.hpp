@@ -42,7 +42,6 @@ struct who_is_online_query_desc_s : public desc_s
 struct message_query_desc_s : public desc_s
 {
     message_query_desc_s() {signature = query_signature; type = QueryType::MESSAGE;}
-    unsigned int message_length;
 }; // struct message_query_desc_s
 
 struct private_message_query_desc_s : public desc_s
