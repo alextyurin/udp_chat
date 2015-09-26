@@ -1,21 +1,8 @@
 #include <iostream>
 #include <QByteArray>
 #include <QUdpSocket>
-
+#include <QDateTime>
 #include "server.hpp"
-
-namespace
-{
-    using udp_chat::user_desc_s;
-    bool operator<(const user_desc_s &lhs, const user_desc_s &rhs)
-    {
-        if (lhs.ip == rhs.ip)
-        {
-            return lhs.port < rhs.port;
-        }
-        return lhs.ip < rhs.ip;
-    }
-} // anonymous namespace
 
 namespace udp_chat
 {
@@ -102,7 +89,7 @@ void Server::send_check_connection_query()
     {
         if (!m_users[user_desc].checked)
         {
-            std::cout << "User " << m_users[user_desc].nickname.toStdString() << " disconected" << std::endl;
+            print_msg("User " + m_users[user_desc].nickname + " disconected");
             m_users.remove(user_desc);
             for (auto &user : m_users.keys())
             {
@@ -127,7 +114,7 @@ void Server::send_check_connection_query()
     m_mutex.unlock();
 }
 
-void Server::send_message_answer(const QString &msg, user_desc_s &user_desc, const QHostAddress &address, const quint16 port)
+void Server::send_message_answer(const QString &msg, const user_desc_s &user_desc, const QHostAddress &address, const quint16 port)
 {
     QByteArray byte_array;
     quint32 msg_size = msg.length();
@@ -138,7 +125,30 @@ void Server::send_message_answer(const QString &msg, user_desc_s &user_desc, con
     answer::message_answer_desc_s desc;
     datagram.write(&desc, sizeof(answer::message_answer_desc_s));
     //user desc
-    datagram.write(&user_desc, sizeof(user_desc_s));
+    user_desc_s user = user_desc;
+    datagram.write(&user, sizeof(user_desc_s));
+    //msg
+    datagram.write(&msg_size, sizeof(quint32));
+    datagram.write(msg.toLocal8Bit().data(), msg_size);
+    m_socket->writeDatagram(byte_array, address, port);
+}
+
+void Server::send_private_message_answer(const QString &msg, const user_desc_s &src, const user_desc_s &dst, const QHostAddress &address, const quint16 port)
+{
+    QByteArray byte_array;
+    quint32 msg_size = msg.length();
+    const quint32 datagram_size = sizeof(answer::message_answer_desc_s) + 2 * sizeof(user_desc_s) + sizeof(quint32) + msg_size;
+    byte_array.resize(datagram_size);
+    Datagram datagram(byte_array);
+    //desc
+    answer::private_message_answer_desc_s desc;
+    datagram.write(&desc, sizeof(answer::private_message_answer_desc_s));
+    //sender
+    user_desc_s sender = src;
+    datagram.write(&sender, sizeof(user_desc_s));
+    //reciever
+    user_desc_s reciever = dst;
+    datagram.write(&reciever, sizeof(user_desc_s));
     //msg
     datagram.write(&msg_size, sizeof(quint32));
     datagram.write(msg.toLocal8Bit().data(), msg_size);
@@ -153,7 +163,7 @@ void Server::process_connection_query(Datagram &data, const QHostAddress &addres
     nickname.resize(nickname_size);
     data.read(nickname.data(), nickname_size);
 
-    std::cout << "User " << QString(nickname).toStdString() << " from " << address.toString().toStdString() << "::" << port << " connects..." << std::endl;
+    print_msg("User " + QString(nickname) + " from " + address.toString() + "::" + QString::number(port) + " connects...");
 
     user_desc_s user_desc;
     user_desc.ip = address.toIPv4Address();
@@ -182,6 +192,29 @@ QString Server::process_message_query(Datagram &data)
     return std::move(QString(msg));
 }
 
+void Server::process_private_message_query(Datagram &data, const user_desc_s &sender)
+{
+    //user_desc
+    user_desc_s reciever;
+    data.read(&reciever, sizeof(user_desc_s));
+
+    //msg
+    QByteArray msg;
+    quint32 msg_size;
+    data.read(&msg_size, sizeof(quint32));
+    msg.resize(msg_size);
+    data.read(msg.data(), msg_size);
+
+    //send message
+    send_private_message_answer(QString(msg), sender, reciever, QHostAddress(sender.ip), sender.port);
+    if (!(sender == reciever))
+    {
+        send_private_message_answer(QString(msg), sender, reciever, QHostAddress(reciever.ip), reciever.port);
+    }
+    print_msg("Private message from " + m_users[sender].nickname + "[" + to_string(sender.ip, sender.port) + "]" +
+              " to " + m_users[reciever].nickname + "[" + to_string(reciever.ip, reciever.port) + "]: " + QString(msg));
+}
+
 void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, const quint16 port)
 {
 
@@ -198,7 +231,6 @@ void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
         }
         else if (query::QueryType::WHO_IS_ONLINE == desc.type)
         {
-            std::cout << "Recive who_is_online query from " << address.toString().toStdString() << "::" << port << std::endl;
             m_mutex.lock();
             for (auto &connected_user_desc : m_users.keys())
             {
@@ -211,8 +243,8 @@ void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
             QString msg = process_message_query(data);
             user_desc_s sender;
             sender.ip = address.toIPv4Address();
-            sender.port = port;
-            std::cout << "Recieved message from " << m_users[sender].nickname.toStdString() << "[" << QHostAddress(sender.ip).toString().toStdString() << "::" << sender.port << "]: " << msg.toStdString() << std::endl;
+            sender.port = port;            
+            print_msg("Message from " + m_users[sender].nickname + "[" + to_string(sender.ip, sender.port) + "]: " + msg);
             m_mutex.lock();
             for (auto &user_desc : m_users.keys())
             {
@@ -222,7 +254,10 @@ void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
         }
         else if (query::QueryType::PRIVATE_MESSAGE == desc.type)
         {
-
+            user_desc_s sender;
+            sender.ip = address.toIPv4Address();
+            sender.port = port;
+            process_private_message_query(data, sender);
         }
         else if (query::QueryType::CHECK_CONNECTION == desc.type)
         {
@@ -246,11 +281,16 @@ void Server::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
 
 void Server::start()
 {
-    std::cout << "Server started..." << std::endl;
+    print_msg("Server started...");
     CheckConnection *checker = new CheckConnection(this);
     checker->start();
     connect(m_socket, SIGNAL(readyRead()), this, SLOT(listen()));
 }
 
+void Server::print_msg(const QString &msg)
+{
+    std::cout << "[" << QDateTime::currentDateTime().toString().toStdString() << "] ";
+    std::cout << msg.toStdString() << std::endl;
+}
 } //namespace server
 } //namespace udp_chat

@@ -16,12 +16,14 @@ CONFIG   += c++11
 SOURCES += main.cpp\
         mainwindow.cpp \
     client.cpp \
-    ../common/datagram.cpp
+    ../common/datagram.cpp \
+    ../common/message_interface.cpp
 
 HEADERS  += mainwindow.h \
     client.hpp \
     ../common/message_interface.hpp \
     ../common/datagram.hpp \
-    ../common/exception.hpp
+    ../common/exception.hpp \
+    userlist.hpp
 
 FORMS    += mainwindow.ui

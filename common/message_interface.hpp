@@ -1,24 +1,37 @@
 #pragma once
+#include <QString>
+#include <QHostAddress>
 
 namespace udp_chat
 {
 
 struct user_desc_s
 {
-    unsigned int ip;
-    unsigned short port;
+    user_desc_s() {}
+    user_desc_s(const quint32 _ip, const quint16 _port): ip(_ip), port(_port) {}
+    quint32 ip;
+    quint16 port;
 }; // struct user_desc_s
 
 struct desc_s
 {
-    unsigned int signature;
+    quint32 signature;
     unsigned char type;
 }; // struct desc_s
+
+bool operator<(const user_desc_s &lhs, const user_desc_s &rhs);
+
+bool operator==(const user_desc_s &lhs, const user_desc_s &rhs);
+
+bool operator!=(const user_desc_s &lhs, const user_desc_s &rhs);
+
+QString to_string(quint32 ip);
+QString to_string(quint32 ip, quint16 port);
 
 namespace query
 {
     
-const unsigned int query_signature = 6593485;  
+const quint32 query_signature = 6593485;
   
 enum QueryType 
 {
@@ -66,6 +79,7 @@ enum AnswerType
     USER_ONLINE,
     USER_OFFLINE,
     MESSAGE,
+    PRIVATE_MESSAGE,
     CHECK_CONNECTION
 }; // enum AnswerType
 
@@ -88,6 +102,11 @@ struct message_answer_desc_s : public desc_s
 {
     message_answer_desc_s() {signature = answer_signature; type = AnswerType::MESSAGE;}
 }; // struct message_answer_desc_s
+
+struct private_message_answer_desc_s : public desc_s
+{
+    private_message_answer_desc_s() {signature = answer_signature; type = AnswerType::PRIVATE_MESSAGE;}
+}; // struct private_message_answer_desc_s
 
 struct check_connection_answer_desc_s : public desc_s
 {

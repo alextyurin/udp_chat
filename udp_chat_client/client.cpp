@@ -4,32 +4,20 @@
 #include <QUdpSocket>
 #include "client.hpp"
 
-namespace
-{
-    using udp_chat::user_desc_s;
-    bool operator<(const user_desc_s &lhs, const user_desc_s &rhs)
-    {
-        if (lhs.ip == rhs.ip)
-        {
-            return lhs.port < rhs.port;
-        }
-        return lhs.ip < rhs.ip;
-    }
-} // anonymous namespace
-
 namespace udp_chat
 {
 namespace client
 {
 
-Client::Client(const QHostAddress &server_address, const quint16 server_port, const quint16 port, QObject *parent):
+Client::Client(const QHostAddress &server_address, const quint16 server_port, QObject *parent):
     QObject(parent),
+    m_socket(new QUdpSocket(parent)),
     m_server_address(server_address),
     m_server_port(server_port),
-    m_socket(new QUdpSocket(parent)),
-    m_mutex()
+    m_mutex(),
+    m_checked(false)
 {
-    m_socket->bind(QHostAddress::Any, port);
+    m_socket->bind(QHostAddress::Any);
 }
 
 Client::~Client()
@@ -38,9 +26,13 @@ Client::~Client()
 
 void Client::start()
 {
-    qDebug() << "Client started...";
     send_connection_query();
-    connect(m_socket, SIGNAL(readyRead()), this, SLOT(listen()));
+    QObject::connect(m_socket, SIGNAL(readyRead()), this, SLOT(listen()));
+}
+
+void Client::stop()
+{
+    m_socket->close();
 }
 
 void Client::send_connection_query()
@@ -58,7 +50,7 @@ void Client::send_connection_query()
     datagram.write(m_nickname.toLocal8Bit().data(), nickname_size);
 
     m_socket->writeDatagram(byte_array, m_server_address, m_server_port);
-    qDebug() << "Connecting to " << m_server_address.toString() << "::" << m_server_port << "...";
+    status("Connecting to " + to_string(m_server_address.toIPv4Address(), m_server_port) + "...");
 }
 
 void Client::send_message_query(const QString &msg)
@@ -77,7 +69,27 @@ void Client::send_message_query(const QString &msg)
     datagram.write(msg.toLocal8Bit().data(), msg_size);
 
     m_socket->writeDatagram(byte_array, m_server_address, m_server_port);
-    qDebug() << "Sending message " << msg << " to" << m_server_address.toString() << "::" << m_server_port << "...";
+}
+
+void Client::send_private_message_query(const quint32 ip, const quint16 port, const QString &msg)
+{
+    QByteArray byte_array;
+    quint32 msg_size = msg.size();
+    const quint32 datagram_size = sizeof(query::private_message_query_desc_s) + sizeof(user_desc_s) + sizeof(quint32) + sizeof(char) * msg_size;
+    byte_array.resize(datagram_size);
+
+    Datagram datagram(byte_array);
+    //desc
+    query::private_message_query_desc_s desc;
+    datagram.write(&desc, sizeof(query::private_message_query_desc_s));
+    //user_desc
+    user_desc_s user_desc(ip, port);
+    datagram.write(&user_desc, sizeof(user_desc_s));
+    //message
+    datagram.write(&msg_size, sizeof(quint32));
+    datagram.write(msg.toLocal8Bit().data(), msg_size);
+
+    m_socket->writeDatagram(byte_array, m_server_address, m_server_port);
 }
 
 void Client::send_descriptor(desc_s desc)
@@ -90,7 +102,6 @@ void Client::send_descriptor(desc_s desc)
 
 void Client::send_who_is_online_query()
 {
-    qDebug() << "Sending who_is_online query...";
     query::who_is_online_query_desc_s desc;
     send_descriptor(desc);
 }
@@ -103,13 +114,11 @@ void Client::send_check_connection_answer()
 
 bool Client::send_check_connection_query()
 {
-    m_mutex.lock();
-    if (!m_connected)
+    if (!m_checked)
     {
         return false;
     }
-    m_connected = false;
-    m_mutex.unlock();
+    m_checked = false;
     query::check_connection_query_desc_s desc;
     send_descriptor(desc);
     return true;
@@ -131,9 +140,9 @@ void Client::process_user_online_answer(Datagram &data)
     data.read(&nickname_length, sizeof(quint32));
     nickname.resize(nickname_length);
     data.read(nickname.data(), nickname_length);
-    m_users[user_desc] = QString(nickname);
-    user_online(QString(nickname));
-    qDebug() << QString(nickname) << user_desc.port << " online!";
+    UserList::instance().add(user_desc, nickname);
+    user_online(user_desc.ip, user_desc.port);
+    status("User " + QString(nickname) + " online!");
 }
 
 void Client::process_user_offline_answer(Datagram &data)
@@ -141,9 +150,9 @@ void Client::process_user_offline_answer(Datagram &data)
     //user desc
     user_desc_s user_desc;
     data.read(&user_desc, sizeof(user_desc_s));
-    user_offline(QString(m_users[user_desc]));
-    qDebug() << m_users[user_desc] << " ofline!";
-    m_users.remove(user_desc);
+    user_offline(user_desc.ip, user_desc.port);
+    status("User " + UserList::instance().get(user_desc) + " offline!");
+    UserList::instance().remove(user_desc);
 }
 
 void Client::process_message_answer(Datagram &data)
@@ -151,13 +160,33 @@ void Client::process_message_answer(Datagram &data)
     //user desc
     user_desc_s user_desc;
     data.read(&user_desc, sizeof(user_desc_s));
+    //msg
     quint32 msg_size;
     QByteArray msg;
     data.read(&msg_size, sizeof(quint32));
     msg.resize(msg_size);
     data.read(msg.data(), msg_size);
-    show_message(m_users[user_desc] + ": " + QString(msg));
-    qDebug() << "Recieve msg from " << m_users[user_desc] << ": " << QString(msg);
+    show_message(UserList::instance().get(user_desc) + ": " + QString(msg));
+}
+
+void Client::process_private_message_answer(Datagram &data)
+{
+    //sender
+    user_desc_s sender;
+    data.read(&sender, sizeof(user_desc_s));
+    //reciever
+    user_desc_s reciever;
+    data.read(&reciever, sizeof(user_desc_s));
+    //msg
+    quint32 msg_size;
+    QByteArray msg;
+    data.read(&msg_size, sizeof(quint32));
+    msg.resize(msg_size);
+    data.read(msg.data(), msg_size);
+
+    const QString sender_nickname = UserList::instance().get(sender);
+    const QString reciever_nickname = UserList::instance().get(reciever);
+    show_message(sender_nickname + "->" + reciever_nickname + ": " + QString(msg));
 }
 
 void Client::read_datagram(QByteArray &byte_array, const QHostAddress &address, const quint16 port)
@@ -172,9 +201,10 @@ void Client::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
         {
             if (answer::AnswerType::CONNECTED == desc.type)
             {
-                qDebug() << "Connected!";
+                status("Connected!");
+                connected();
                 m_mutex.lock();
-                m_connected = true;
+                m_checked = true;
                 m_mutex.unlock();
                 CheckConnection *checker = new CheckConnection(this);
                 checker->start();
@@ -192,10 +222,14 @@ void Client::read_datagram(QByteArray &byte_array, const QHostAddress &address, 
             {
                 process_message_answer(data);
             }
+            else if (answer::AnswerType::PRIVATE_MESSAGE == desc.type)
+            {
+                process_private_message_answer(data);
+            }
             else if (answer::AnswerType::CHECK_CONNECTION == desc.type)
             {
                 m_mutex.lock();
-                m_connected = true;
+                m_checked = true;
                 m_mutex.unlock();
             }
         }
