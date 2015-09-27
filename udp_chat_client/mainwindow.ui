@@ -14,13 +14,13 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <widget class="QWidget" name="layoutWidget">
+   <widget class="QWidget" name="">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>10</y>
-      <width>548</width>
-      <height>528</height>
+      <x>40</x>
+      <y>30</y>
+      <width>416</width>
+      <height>304</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="general">
@@ -55,13 +55,13 @@
          </property>
          <property name="minimumSize">
           <size>
-           <width>100</width>
+           <width>150</width>
            <height>0</height>
           </size>
          </property>
          <property name="maximumSize">
           <size>
-           <width>100</width>
+           <width>150</width>
            <height>16777215</height>
           </size>
          </property>
@@ -71,9 +71,6 @@
      </item>
      <item>
       <layout class="QHBoxLayout" name="bottom">
-       <property name="sizeConstraint">
-        <enum>QLayout::SetDefaultConstraint</enum>
-       </property>
        <item>
         <widget class="QPlainTextEdit" name="textEdit">
          <property name="sizePolicy">
@@ -97,29 +94,67 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="sendButton">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>100</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>100</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>Send</string>
-         </property>
-        </widget>
+        <layout class="QVBoxLayout" name="buttons">
+         <item>
+          <widget class="QPushButton" name="sendButton">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>150</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>150</width>
+             <height>80</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>Send</string>
+           </property>
+           <property name="flat">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="clear">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>150</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>150</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>Clear</string>
+           </property>
+           <property name="flat">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </item>
@@ -140,6 +175,7 @@
      <string>File</string>
     </property>
     <addaction name="actionConnect"/>
+    <addaction name="actionDisconnect"/>
     <addaction name="actionExit"/>
    </widget>
    <addaction name="menuConnect"/>
@@ -148,6 +184,17 @@
   <action name="actionConnect">
    <property name="text">
     <string>Connect</string>
+   </property>
+  </action>
+  <action name="actionDisconnect">
+   <property name="text">
+    <string>Disconnect</string>
+   </property>
+   <property name="iconText">
+    <string>Disconnect</string>
+   </property>
+   <property name="toolTip">
+    <string>Disconnect</string>
    </property>
   </action>
   <action name="actionExit">

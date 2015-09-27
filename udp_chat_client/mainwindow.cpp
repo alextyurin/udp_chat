@@ -1,3 +1,5 @@
+#include <QTime>
+#include <QTimer>
 #include "../common/message_interface.hpp"
 #include "userlist.hpp"
 #include "mainwindow.h"
@@ -6,11 +8,16 @@
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    m_private_mode(false)
+    m_private_mode(false),
+    m_connected(false),
+    m_connected_clicked(false)
 {
     ui->setupUi(this);
     ui->centralWidget->setLayout(ui->general);
     QObject::connect(this->ui->sendButton, SIGNAL(clicked()), this, SLOT(button_clicked()));
+    QObject::connect(this->ui->clear, SIGNAL(clicked()), this, SLOT(clear_clicked()));
+    QObject::connect(this->ui->actionConnect, SIGNAL(triggered()), this, SLOT(connect_clicked()));
+    QObject::connect(this->ui->actionDisconnect, SIGNAL(triggered()), this, SLOT(disconnect_clicked()));
     QObject::connect(this->ui->user_list, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(user_list_double_clicked(QModelIndex)));
     disable();
 }
@@ -55,22 +62,33 @@ void MainWindow::remove_user(const quint32 ip, const quint16 port)
 
 void MainWindow::enable()
 {
+    m_connected = true;
     ui->sendButton->setEnabled(true);
     ui->user_list->setEnabled(true);
     ui->textEdit->setEnabled(true);
+    ui->clear->setEnabled(true);
 }
 
 void MainWindow::disable()
 {
+    m_connected = false;
     m_keys.clear();
     ui->user_list->clear();
     ui->sendButton->setEnabled(false);
     ui->user_list->setEnabled(false);
     ui->textEdit->setEnabled(false);
+    ui->clear->setEnabled(false);
+    ui->actionConnect->setEnabled(true);
+    ui->actionDisconnect->setEnabled(false);
+    udp_chat::client::UserList::instance().clear();
 }
 
 void MainWindow::button_clicked()
 {
+    if (ui->textEdit->toPlainText().size() == 0)
+    {
+        return;
+    }
     if (m_private_mode)
     {
         send_private_msg(m_reciever.ip, m_reciever.port, ui->textEdit->toPlainText().toLocal8Bit());
@@ -82,6 +100,54 @@ void MainWindow::button_clicked()
         send_msg(ui->textEdit->toPlainText().toLocal8Bit());
     }
     ui->textEdit->clear();
+}
+
+void MainWindow::clear_clicked()
+{
+    ui->textEdit->clear();
+    ui->sendButton->setText("Send");
+    m_private_mode = false;
+}
+
+void MainWindow::connect_clicked()
+{
+    ui->actionConnect->setEnabled(false);
+    ui->actionDisconnect->setEnabled(true);
+    m_connected_clicked = true;
+    //TODO: Чтение из гуи
+    m_server_address = QHostAddress::LocalHost;
+    m_server_port = 10000;
+
+    QTime midnight(0,0,0);
+    qsrand(midnight.secsTo(QTime::currentTime()));
+    QString nickname = "User" + QString::number(qrand() % 10000);
+
+    set_nickname(nickname);
+    try_to_connect(m_server_address, m_server_port);
+    QTimer *timer = new QTimer(this);
+    QObject::connect(timer, SIGNAL(timeout()), this, SLOT(repeat_connect()));
+    timer->start(2000);
+}
+
+void MainWindow::repeat_connect()
+{
+    if (m_connected_clicked)
+    {
+        if (!m_connected)
+        {
+            disconnect();
+            try_to_connect(m_server_address, m_server_port);
+        }
+    }
+}
+
+void MainWindow::disconnect_clicked()
+{
+    ui->actionConnect->setEnabled(true);
+    ui->actionDisconnect->setEnabled(false);
+    m_connected_clicked = false;
+    disconnect();
+    disable();
 }
 
 void MainWindow::user_list_double_clicked(const QModelIndex &index)

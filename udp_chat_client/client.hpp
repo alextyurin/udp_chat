@@ -17,18 +17,18 @@ namespace udp_chat
 namespace client
 {
 
+class CheckConnection;
+
 class Client : public QObject
 {
     Q_OBJECT
 public:
-    explicit Client(const QHostAddress &server_address, const quint16 server_port, QObject *parent = nullptr);
+    explicit Client(QObject *parent = nullptr);
     virtual ~Client();
-    void start();
-    void stop();
-    void set_nickname(const QString &nickname);
     bool send_check_connection_query();
     void send_connection_query();
     bool is_checked() {  return m_checked; }
+    void set_connected(bool state) { m_connected = state; }
     void lock() { m_mutex.lock(); }
     void unlock() { m_mutex.unlock(); }
 signals:
@@ -38,12 +38,16 @@ signals:
     void user_offline(const quint32 address, const quint16 port);
     void connected();
     void disconnected();
+public slots:
+    void set_nickname(const QString &nickname);
+    void start(const QHostAddress &server_address, const quint16 server_port);
+    void stop();
 private slots:
     void listen();
     void send_message_query(const QString &msg);
     void send_private_message_query(const quint32 ip, const quint16 port, const QString &msg);
 private:
-    void read_datagram(QByteArray &byte_array, const QHostAddress &address, const quint16 port);
+    void read_datagram(QByteArray &byte_array);
     void process_user_online_answer(Datagram &data);
     void process_user_offline_answer(Datagram &data);
     void process_message_answer(Datagram &data);
@@ -56,14 +60,16 @@ private:
     QString m_nickname;
     quint16 m_server_port;
     QMutex m_mutex;
+    CheckConnection *m_checker;
     bool m_checked;
+    bool m_connected;
 };
 
 class CheckConnection : public QThread
 {
     Q_OBJECT
 public:
-    explicit CheckConnection(Client *client):m_client(client) {}
+    explicit CheckConnection(Client *client):QThread(client), m_client(client) {}
     virtual ~CheckConnection() {}
 public slots:
     void run()
@@ -73,10 +79,9 @@ public slots:
             m_client->lock();
             if (!m_client->send_check_connection_query())
             {
-                UserList::instance().clear();
-                m_client->disconnected();
                 m_client->status("Connection lost...");
-                m_client->stop();
+                m_client->disconnected();
+                m_client->set_connected(false);
                 return;
             }
             m_client->unlock();

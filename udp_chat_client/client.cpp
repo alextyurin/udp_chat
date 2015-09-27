@@ -1,5 +1,3 @@
-#include <chrono>
-#include <thread>
 #include <QHostAddress>
 #include <QUdpSocket>
 #include "client.hpp"
@@ -9,29 +7,34 @@ namespace udp_chat
 namespace client
 {
 
-Client::Client(const QHostAddress &server_address, const quint16 server_port, QObject *parent):
+Client::Client(QObject *parent):
     QObject(parent),
-    m_socket(new QUdpSocket(parent)),
-    m_server_address(server_address),
-    m_server_port(server_port),
     m_mutex(),
-    m_checked(false)
-{
-    m_socket->bind(QHostAddress::Any);
+    m_checked(true),
+    m_connected(false),
+    m_checker(new CheckConnection(this))
+{    
+    m_socket = new QUdpSocket(this);
 }
 
 Client::~Client()
 {
+
 }
 
-void Client::start()
+void Client::start(const QHostAddress &server_address, const quint16 server_port)
 {
+    m_server_address = server_address;
+    m_server_port = server_port;
+    m_socket->bind(QHostAddress::Any);
     send_connection_query();
     QObject::connect(m_socket, SIGNAL(readyRead()), this, SLOT(listen()));
+    m_checker->start();
 }
 
 void Client::stop()
 {
+    m_checker->terminate();
     m_socket->close();
 }
 
@@ -189,56 +192,49 @@ void Client::process_private_message_answer(Datagram &data)
     show_message(sender_nickname + "->" + reciever_nickname + ": " + QString(msg));
 }
 
-void Client::read_datagram(QByteArray &byte_array, const QHostAddress &address, const quint16 port)
+void Client::read_datagram(QByteArray &byte_array)
 {
     Datagram data(byte_array);
     desc_s desc;
     data.read(&desc, sizeof(desc_s));
 
-    if (address == m_server_address && port == m_server_port)
+    if (answer::answer_signature == desc.signature)
     {
-        if (answer::answer_signature == desc.signature)
+        if (answer::AnswerType::CONNECTED == desc.type)
         {
-            if (answer::AnswerType::CONNECTED == desc.type)
-            {
-                status("Connected!");
-                connected();
-                m_mutex.lock();
-                m_checked = true;
-                m_mutex.unlock();
-                CheckConnection *checker = new CheckConnection(this);
-                checker->start();
-                send_who_is_online_query();
-            }
-            else if (answer::AnswerType::USER_ONLINE == desc.type)
-            {
-                process_user_online_answer(data);
-            }
-            else if (answer::AnswerType::USER_OFFLINE == desc.type)
-            {
-                process_user_offline_answer(data);
-            }
-            else if (answer::AnswerType::MESSAGE == desc.type)
-            {
-                process_message_answer(data);
-            }
-            else if (answer::AnswerType::PRIVATE_MESSAGE == desc.type)
-            {
-                process_private_message_answer(data);
-            }
-            else if (answer::AnswerType::CHECK_CONNECTION == desc.type)
-            {
-                m_mutex.lock();
-                m_checked = true;
-                m_mutex.unlock();
-            }
+            status("Connected!");
+            m_connected = true;
+            connected();
+            send_who_is_online_query();
         }
-        else if (query::query_signature == desc.signature)
+        else if (answer::AnswerType::USER_ONLINE == desc.type)
         {
-            if (query::QueryType::CHECK_CONNECTION == desc.type)
-            {
-                send_check_connection_answer();
-            }
+            process_user_online_answer(data);
+        }
+        else if (answer::AnswerType::USER_OFFLINE == desc.type)
+        {
+            process_user_offline_answer(data);
+        }
+        else if (answer::AnswerType::MESSAGE == desc.type)
+        {
+            process_message_answer(data);
+        }
+        else if (answer::AnswerType::PRIVATE_MESSAGE == desc.type)
+        {
+            process_private_message_answer(data);
+        }
+        else if (answer::AnswerType::CHECK_CONNECTION == desc.type)
+        {
+            m_mutex.lock();
+            m_checked = true;
+            m_mutex.unlock();
+        }
+    }
+    else if (query::query_signature == desc.signature)
+    {
+        if (query::QueryType::CHECK_CONNECTION == desc.type)
+        {
+            send_check_connection_answer();
         }
     }
 }
@@ -250,10 +246,8 @@ void Client::listen()
     {
         QByteArray datagram;
         datagram.resize(m_socket->pendingDatagramSize());
-        QHostAddress sender;
-        quint16 sender_port;
-        m_socket->readDatagram(datagram.data(), datagram.size(), &sender, &sender_port);
-        read_datagram(datagram, sender, sender_port);
+        m_socket->readDatagram(datagram.data(), datagram.size());
+        read_datagram(datagram);
     }
 }
 
