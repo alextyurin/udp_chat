@@ -198,7 +198,7 @@ void Client::read_datagram(QByteArray &byte_array)
     desc_s desc;
     data.read(&desc, sizeof(desc_s));
 
-    if (answer::answer_signature == desc.signature)
+   if (answer::answer_signature == desc.signature)
     {
         if (answer::AnswerType::CONNECTED == desc.type)
         {

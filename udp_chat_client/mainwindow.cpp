@@ -1,5 +1,6 @@
 #include <QTime>
 #include <QTimer>
+#include<QDebug>
 #include "../common/message_interface.hpp"
 #include "userlist.hpp"
 #include "mainwindow.h"
@@ -19,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(this->ui->actionConnect, SIGNAL(triggered()), this, SLOT(connect_clicked()));
     QObject::connect(this->ui->actionDisconnect, SIGNAL(triggered()), this, SLOT(disconnect_clicked()));
     QObject::connect(this->ui->user_list, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(user_list_double_clicked(QModelIndex)));
+    QObject::connect(&nClient,SIGNAL(create_client()),this,SLOT(create_user()));
     disable();
 }
 
@@ -111,22 +113,26 @@ void MainWindow::clear_clicked()
 
 void MainWindow::connect_clicked()
 {
-    ui->actionConnect->setEnabled(false);
-    ui->actionDisconnect->setEnabled(true);
-    m_connected_clicked = true;
-    //TODO: Чтение из гуи
-    m_server_address = QHostAddress::LocalHost;
-    m_server_port = 10000;
-
-    QTime midnight(0,0,0);
-    qsrand(midnight.secsTo(QTime::currentTime()));
-    QString nickname = "User" + QString::number(qrand() % 10000);
-
-    set_nickname(nickname);
-    try_to_connect(m_server_address, m_server_port);
-    QTimer *timer = new QTimer(this);
-    QObject::connect(timer, SIGNAL(timeout()), this, SLOT(repeat_connect()));
-    timer->start(2000);
+    nClient.show();
+}
+void MainWindow::create_user()
+{
+        ui->actionConnect->setEnabled(false);
+        ui->actionDisconnect->setEnabled(true);
+        m_connected_clicked = true;
+        m_server_address = nClient.get_addr();
+        m_server_port = nClient.get_port();
+        QString nickname;
+        nickname = nClient.get_nickname();
+//        qDebug()<<m_server_address;
+//        qDebug()<<m_server_port;
+//        qDebug()<<nickname;
+        set_nickname(nickname);
+        nClient.hide();
+        try_to_connect(m_server_address, m_server_port);
+        QTimer *timer = new QTimer(this);
+        QObject::connect(timer, SIGNAL(timeout()), this, SLOT(repeat_connect()));
+        timer->start(2000);
 }
 
 void MainWindow::repeat_connect()

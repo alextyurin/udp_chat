@@ -17,13 +17,16 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     client.cpp \
     ../common/datagram.cpp \
-    ../common/message_interface.cpp
+    ../common/message_interface.cpp \
+    client_con.cpp
 
 HEADERS  += mainwindow.h \
     client.hpp \
     ../common/message_interface.hpp \
     ../common/datagram.hpp \
     ../common/exception.hpp \
-    userlist.hpp
+    userlist.hpp \
+    client_con.h
 
-FORMS    += mainwindow.ui
+FORMS    += mainwindow.ui \
+    client_con.ui

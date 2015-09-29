@@ -6,7 +6,7 @@
 #include <QPair>
 #include "../common/message_interface.hpp"
 #include "client.hpp"
-
+#include"client_con.h"
 namespace Ui
 {
     class MainWindow;
@@ -20,6 +20,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
+    client_con nClient;
 signals:
     void send_msg(const QString &msg);
     void send_private_msg(const quint32 ip, const quint16 port, const QString &msg);
@@ -37,10 +38,12 @@ public slots:
 private slots:
     void button_clicked();
     void clear_clicked();
+    void create_user();
     void connect_clicked();
     void disconnect_clicked();
     void user_list_double_clicked(const QModelIndex &index);
 private:
+
     keys_t m_keys;
     Ui::MainWindow *ui;
     QHostAddress m_server_address;
