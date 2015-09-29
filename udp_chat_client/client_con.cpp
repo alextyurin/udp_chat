@@ -35,6 +35,5 @@ QHostAddress client_con::get_addr()
 {
     QHostAddress addr;
     addr=ui->server_addr->text();
-//    addr=QHostAddress::LocalHost;
     return addr;
 }

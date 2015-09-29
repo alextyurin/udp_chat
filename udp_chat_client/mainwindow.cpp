@@ -31,7 +31,10 @@ MainWindow::~MainWindow()
 
 void MainWindow::recieve_msg(const QString &msg)
 {
-    ui->textView->append(msg);
+    QString cur_time=QTime::currentTime().toString();
+    cur_time.prepend("<font color=grey>");
+    cur_time.append("</font> ");
+    ui->textView->append(cur_time+msg);
 }
 
 void MainWindow::show_status(const QString &msg)
