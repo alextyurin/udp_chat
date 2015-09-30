@@ -1,6 +1,6 @@
 #include <QTime>
 #include <QTimer>
-#include<QDebug>
+#include <QMessageBox>
 #include "../common/message_interface.hpp"
 #include "userlist.hpp"
 #include "mainwindow.h"
@@ -21,12 +21,23 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(this->ui->actionDisconnect, SIGNAL(triggered()), this, SLOT(disconnect_clicked()));
     QObject::connect(this->ui->user_list, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(user_list_double_clicked(QModelIndex)));
     QObject::connect(&nClient,SIGNAL(create_client()),this,SLOT(create_user()));
+    QObject::connect(this->ui->textEdit, SIGNAL(textChanged()), this, SLOT(textChanged()));
     disable();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+void MainWindow::textChanged()
+{
+    if (ui->textEdit->toPlainText().length() >= 500)
+    {
+        QString str = ui->textEdit->toPlainText().mid(0,499);
+        ui->textEdit->clear();
+        ui->textEdit->appendPlainText(str);
+        QMessageBox::warning(this, "Warning", "Maximum length of message 500 symbols!!!");
+    }
 }
 
 void MainWindow::recieve_msg(const QString &msg)
@@ -131,20 +142,18 @@ void MainWindow::create_user()
         set_nickname(nickname);
         nClient.hide();
         try_to_connect(m_server_address, m_server_port);
-        //QTimer *timer = new QTimer(this);
-        //QObject::connect(timer, SIGNAL(timeout()), this, SLOT(repeat_connect()));
-        //timer->start(2000);
+        QTimer *timer = new QTimer(this);
+        QObject::connect(timer, SIGNAL(timeout()), this, SLOT(repeat_connect()));
+        timer->start(2000);
 }
 
 void MainWindow::repeat_connect()
 {
-    if (m_connected_clicked)
+    if (!m_connected)
     {
-        if (!m_connected)
-        {
-            disconnect();
-            try_to_connect(m_server_address, m_server_port);
-        }
+        ui->statusBar->showMessage("Cannot connect to " + udp_chat::to_string(m_server_address.toIPv4Address(), m_server_port));
+        ui->actionConnect->setEnabled(true);
+        ui->actionDisconnect->setEnabled(false);
     }
 }
 

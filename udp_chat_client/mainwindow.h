@@ -36,6 +36,7 @@ public slots:
     void enable();
     void disable();
 private slots:
+    void textChanged();
     void button_clicked();
     void clear_clicked();
     void create_user();
