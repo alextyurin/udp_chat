@@ -11,7 +11,6 @@ Client::Client(QObject *parent):
     QObject(parent),
     m_mutex(),
     m_checked(true),
-    m_connected(false),
     m_checker(new CheckConnection(this))
 {    
     m_socket = new QUdpSocket(this);
@@ -28,8 +27,7 @@ void Client::start(const QHostAddress &server_address, const quint16 server_port
     m_server_port = server_port;
     m_socket->bind(QHostAddress::Any);
     send_connection_query();
-    QObject::connect(m_socket, SIGNAL(readyRead()), this, SLOT(listen()));
-    m_checker->start();
+    QObject::connect(m_socket, SIGNAL(readyRead()), this, SLOT(listen()));    
 }
 
 void Client::stop()
@@ -117,11 +115,13 @@ void Client::send_check_connection_answer()
 
 bool Client::send_check_connection_query()
 {
+    lock();
     if (!m_checked)
     {
         return false;
     }
     m_checked = false;
+    unlock();
     query::check_connection_query_desc_s desc;
     send_descriptor(desc);
     return true;
@@ -189,7 +189,7 @@ void Client::process_private_message_answer(Datagram &data)
 
     const QString sender_nickname = UserList::instance().get(sender);
     const QString reciever_nickname = UserList::instance().get(reciever);
-    show_message("<font color=blue><b>"+sender_nickname+"</b></font>" + " private massage  "
+    show_message("<font color=blue><b>"+sender_nickname+"</b></font>" + " private message  "
                  +"<font color=red><b>"+ reciever_nickname+"</b></font>"
                  + ": " +"<i>" +QString(msg)+"</i>");
 }
@@ -205,8 +205,11 @@ void Client::read_datagram(QByteArray &byte_array)
         if (answer::AnswerType::CONNECTED == desc.type)
         {
             status("Connected!");
-            m_connected = true;
             connected();
+            //m_mutex.lock();
+            m_checked = true;
+            //m_mutex.unlock();
+            m_checker->start();
             send_who_is_online_query();
         }
         else if (answer::AnswerType::USER_ONLINE == desc.type)

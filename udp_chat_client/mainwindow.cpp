@@ -76,6 +76,7 @@ void MainWindow::enable()
 
 void MainWindow::disable()
 {
+    disconnect();
     m_connected = false;
     m_keys.clear();
     ui->user_list->clear();
@@ -127,15 +128,12 @@ void MainWindow::create_user()
         m_server_port = nClient.get_port();
         QString nickname;
         nickname = nClient.get_nickname();
-//        qDebug()<<m_server_address;
-//        qDebug()<<m_server_port;
-//        qDebug()<<nickname;
         set_nickname(nickname);
         nClient.hide();
         try_to_connect(m_server_address, m_server_port);
-        QTimer *timer = new QTimer(this);
-        QObject::connect(timer, SIGNAL(timeout()), this, SLOT(repeat_connect()));
-        timer->start(2000);
+        //QTimer *timer = new QTimer(this);
+        //QObject::connect(timer, SIGNAL(timeout()), this, SLOT(repeat_connect()));
+        //timer->start(2000);
 }
 
 void MainWindow::repeat_connect()

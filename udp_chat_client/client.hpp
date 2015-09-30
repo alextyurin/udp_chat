@@ -27,8 +27,6 @@ public:
     virtual ~Client();
     bool send_check_connection_query();
     void send_connection_query();
-    bool is_checked() {  return m_checked; }
-    void set_connected(bool state) { m_connected = state; }
     void lock() { m_mutex.lock(); }
     void unlock() { m_mutex.unlock(); }
 signals:
@@ -76,15 +74,12 @@ public slots:
     {
         while (true)
         {
-            m_client->lock();
             if (!m_client->send_check_connection_query())
             {
                 m_client->status("Connection lost...");
                 m_client->disconnected();
-                m_client->set_connected(false);
                 return;
             }
-            m_client->unlock();
             QThread::sleep(1);
         }
     }

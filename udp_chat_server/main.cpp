@@ -3,15 +3,15 @@
 #include "server.hpp"
 #include "../common/exception.hpp"
 
-namespace
-{
-const int port = 10000;
-} //anonymous namespace
-
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    udp_chat::server::Server server(port);
+    if (argc < 2)
+    {
+        std::cout << "Wrong command. Usage: udp_chat_server [port]" << std::endl;
+        return 0;
+    }
+    udp_chat::server::Server server(static_cast<quint16>(atoi(argv[1])));
     try
     {   
         server.start();

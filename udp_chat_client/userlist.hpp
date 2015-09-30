@@ -2,6 +2,7 @@
 #include <QString>
 #include <QMap>
 #include <QHostAddress>
+#include <QMutex>
 #include "../common/message_interface.hpp"
 #include "../common/exception.hpp"
 
@@ -50,6 +51,7 @@ private:
     UserList(const UserList& root);
     UserList& operator=(const UserList&);
     users_t m_users;
+
 }; //class UserList
 
 } //namespace client
